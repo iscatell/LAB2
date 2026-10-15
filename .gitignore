@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.cpython-*.pyc
+
+# Vivado / EDA
+*.jou
+*.log
+*.str
+*.wdb
+*.vcd
+.Xil/
+hd_visual/
+*.backup.log
+*.backup.jou
+*.runs/
+*.sim/
+*.ip_user_files/
+*.hw/
+*.cache/
