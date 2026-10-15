@@ -1,83 +1,83 @@
-# Лабораторная работа №2: Комбинационный CORDIC atan2 ускоритель
+# ActiveCore
+*Making complex RTL designing rapid, fun, with full control, and plenty of insights*
 
-## Вариант 10: Арктангенс `atan2(y, x)` (CORDIC)
-* **Цель**: Спроектировать, верифицировать и реализовать на FPGA комбинационную реализацию ускорителя прикладной функции `atan2(y, x)` с побитовым соответствием эталонной Python-модели.
-* **Базовый проект**: ActiveCore UDM (UART-based Debug Module) под плату Digilent Nexys A7 (Nexys 4 DDR), чип `xc7a100tcsg324-3`.
-* **Входные аргументы**: $y, x$ — 2x 32-битных знаковых числа с фиксированной точкой (формат `0x0000.0000` / Q16.16).
-* **Выходное значение**: угол $\theta = \text{atan2}(y, x)$ — 32-битное знаковое число с фиксированной точкой в формате **Q3.29** (3 бита на целую часть со знаком, 29 дробных бит, диапазон $[-\pi, +\pi]$).
+### Project description
 
----
+ActiveCore is a framework that demonstrates original hardware designing concept based on **"Kernel IP" (KIP) cores**.
 
-## Архитектура решения
+KIP core is a hardware generator that provides custom synthesizable execution kernel constructed in accordance to certain microarchitectural template. Each KIP core offers hardware description within custom computational model inferred from computational process organization inside hardware microarchitecture, applies microarchitecture-aware optimizations, and generates design specifications in standard RTL/HLS form.
 
-1. **Комбинационный модуль (`atan2_cordic_comb.sv`)**:
-   * Реализует алгоритм CORDIC в векторном режиме (Vectoring mode) без тактового сигнала и регистров (`latency = 0` тактов).
-   * 32 итерации развернуты в каскадную цепочку комбинационных сумматоров и сдвигателей (`always_comb` с блокирующими присваиваниями `=`).
-   * Таблица констант $\text{atan}(2^{-i})$ задана в формате Q3.29.
-   * Предусмотрено приведение вектора в правую полуплоскость при $x < 0$ и финальная нормализация угла к диапазону $[-\pi, \pi]$.
+KIP core's computational model is intended to include:
+* data types with pre-defined order of initialization, assignment, and transfer of values;
+* auto-generated data structures and API for flow control, scheduling, communication, and synchronization "services" of the microarchitecture;
+* "microarchitecture-level" event model and handler procedures selectively exposed for behavioral-style programming of custom application functions and mechanisms.
 
-2. **Интеграция с шиной UDM (`NEXYS4_DDR.sv`)**:
-   * `0x10000000` (Write): регистр аргумента $y$ (`csr_y_in`).
-   * `0x10000004` (Write): регистр аргумента $x$ (`csr_x_in`).
-   * `0x20000000` (Read): чтение вычисленного угла $\theta$ (`csr_angle_out`).
+Compared to other hardware generation frameworks, ActiveCore is constructed according to the following principles:
+* Dynamic generation of all hardware-related content, including data instances, structures, dimensions, expressions, procedural blocks, etc;
+* Decoupling generation logic from certain programming styles (e.g. functional one). ActiveCore relies on basic object-oriented capabilities, however, you can use any paradigm in your generators;
+* Reusing generic AST constructor/container of behavioral HW specifications (see **hwast**) for various KIP cores, with its content being fully accessible for analysis and manipulation.
 
-3. **Верификация (`tb.sv` и `udm_test.py`)**:
-   * Набор тестов охватывает все 4 квадранта, оси координат и нулевую точку $(0, 0)$.
-   * Побитовое соответствие эталонной модели `10-atan2_cordic.py` подтверждено.
+The ultimate goal of the project is to provide top-down methodology and reusable components for explicit allocation of intermediate ***“microarchitectural middleware”*** design level for complex hardware. This design level (inspired by OS, VM, and various middleware in software stacks) decouples application-related logic from selected management mechanisms of hardware microarchitectures, addressing:
+* rapid design of ***functionally differentianted*** IP blocks with common microarchitectural mechanisms;
+* ***diversification of responsibility and competence*** of IP engineers: implementation of engines offering key microarchitectural mechanisms can be charged to the core of leading expert engineers, while developers of final designs can focus solely on application-specific functionality;
+* facilitating IP design centers to package, reuse and deliver basis for ***semi-custom IP cores***, enabling seamless reuse of microarchitectural competence for unique, highly specialized designs.
 
----
+![pic_test](kernelip/__img/kernelip_model.png)
 
-## Структура репозитория
+Aligned to the strategy of e.g. RISC-V project that standardises open (or provides a baseline for) RISC CPU architecture, ActiveCore endeavours to propose open reference implementations of common microarchitectural mechanisms (decoupled from certain architecture).
 
-```
-Lab2/
-├── README.md
-├── src/
-│   ├── atan2_cordic_comb.sv   # Комбинационный модуль CORDIC atan2
-│   └── NEXYS4_DDR.sv          # Топовый модуль с интеграцией шины UDM и CSR
-├── tb/
-│   └── tb.sv                  # Тестбенч для симуляции в Vivado
-└── sw/
-    ├── 10-atan2_cordic.py     # Эталонная модель преподавателя (Golden Model)
-    └── udm_test.py            # Скрипт валидации на реальной плате через UART
-```
+### Project structure
 
----
+Current version of project is implemented as a collection of standalone Kotlin libraries that can be built using IntelliJ IDEA:
+![pic_test](kernelip/__img/Framework.png)
 
-## Тестовые векторы (Bit-accurate verification)
+* **hwast** - generic AST constructor of behavioral-style HW specifications (location: /hwast)
 
-| Квадрант / Вектор | Вход $y$ (dec / hex) | Вход $x$ (dec / hex) | Ожидаемый результат (hex) | Угол (рад) |
-| :--- | :--- | :--- | :--- | :--- |
-| **I**: $(+100, +100)$ | `100` (`0x00000064`) | `100` (`0x00000064`) | `0x191c9ac2` | $\approx +0.7847$ ($+\pi/4$) |
-| **II**: $(+100, -100)$| `100` (`0x00000064`) | `-100` (`0xffffff9c`)| `0x4b60916b` | $\approx +2.3555$ ($+3\pi/4$) |
-| **III**: $(-100, -100)$| `-100` (`0xffffff9c`)| `-100` (`0xffffff9c`)| `0xb494ad71` | $\approx -2.3569$ ($-3\pi/4$) |
-| **IV**: $(-100, +100)$| `-100` (`0xffffff9c`)| `100` (`0x00000064`) | `0xe6d8a41a` | $\approx -0.7861$ ($-\pi/4$) |
-| **+Y ось**: $(+100, 0)$| `100` (`0x00000064`) | `0` (`0x00000000`)   | `0x324a5b8e` | $\approx +1.5716$ ($+\pi/2$) |
-| **Ноль**: $(0, 0)$    | `0` (`0x00000000`)   | `0` (`0x00000000`)   | `0x00000000` | $0.0$ |
+* Demo KIP cores based on hwast (location: /kernelip):
+	* **Rtl** - generator of behavioral RTL. Exports to SystemVerilog HDL
+	* **Cyclix** (**cycli**c e**x**ecution) - generator of hardware performing cyclic statically scheduled computations. Translates either to synchronous RTL for Rtl KIP or to C++ sources for Xilinx HLS
+![pic_test](kernelip/__img/Cyclix.png)
+	* **Pipex** (**pipe**lined e**x**ecution) - generator of hardware with dynamically scheduled scalar in-order pipelined microarchitecture. Supports inter-stage communication and variable-latency I/O synchronization features. Translates to Cyclix KIP. Close analogue (but implemented differently): TL-Verilog project
+![pic_test](kernelip/__img/Pipex.png)
+	* **Reordex** (**reorde**red e**x**ecution) - generator of (co)processors with superscalar out-of-order (OoO) microarchitecture. Supports switchable scoreboarding and register renaming. Translates to Cyclix KIP
+![pic_test](kernelip/__img/Reordex.png)
 
----
 
-## Инструкция по запуску
+* Demo core generators based on KIP cores (location: /designs/coregen):
+	* **Taylor** - sine wave generator demonstrating usage of stalling and credit-based flow control mechanisms, based on Pipex KIP core. Location: /designs/rtl/taylor
+	* **Aquaris** - RISC-V (RV32I + optional M extension and custom-0 coprocessor interfaces) CPU generator with varying-length pipelines (1-6 pipeline stages), based on Pipex KIP core
+![pic_test](designs/rtl/sigma_tile/doc/aquaris_pipeline_structs/aquaris_pipeline_structs.png)
+	* **Ariele** - full xbar generator, based on Pipex KIP core
+	* **Citadel** - OoO FPU coprocessor, based on Reordex KIP core
+	* **Agenda** - OoO RISC-V (RV32IM) CPU, based on Reordex KIP core
+![pic_test](designs/rtl/sigrun_tile/doc/agenda.png)
 
-### 1. Моделирование в Vivado
-1. Откройте проект `activecore-master/designs/rtl/udm/syn/NEXYS4_DDR/NEXYS4_DDR.xpr` в Xilinx Vivado.
-2. В левой панели нажмите **Simulation -> Run Simulation -> Run Behavioral Simulation**.
-3. В окне симуляции раскройте иерархию `DUT`, вынесите на временную диаграмму сигналы `csr_y_in`, `csr_x_in`, `csr_angle_out` и шину `udm_bus`.
-4. В консоли Tcl убедитесь в успешном прохождении тестов и совпадении считанных hex-значений.
+* Auxiliary reusable cores:
+	* **UDM** - bus transactor controlled via UART interface. Supports bursts and bus timeouts. Communication library for Python 3 included. Lab work manual included: https://github.com/AntonovAlexander/activecore/blob/master/designs/rtl/udm/doc/udm_lab_manual.pdf. Location: /designs/rtl/udm
+	* **sigma_tile** - basic CPU tile consisting of a single Aquaris RISC-V core, tightly coupled scratchpad RAM with single-cycle delay, interrupt controller, timer, Host InterFace (HIF), and eXpansion InterFace (XIF). HIF and XIF protocols are equivalent to UDM bus protocol. Location: /designs/rtl/sigma_tile
+![pic_test](designs/rtl/sigma_tile/doc/sigma_tile_struct.png)
+	* **sigrun_tile** - sigma_tile equivalent based on dual-issue superscalar Agenda CPU core and 2-bank RAM. Location: /designs/rtl/sigrun_tile
 
-### 2. Синтез и имплементация
-1. Нажмите **Generate Bitstream**.
-2. По окончании откройте **Open Implemented Design**.
-3. Снимите метрики:
-   * **Timing**: *Report Timing Summary* $\to$ зафиксируйте WNS и TNS.
-   * **Utilization**: *Report Utilization* $\to$ зафиксируйте количество Slice LUTs и Slice Registers (FFs).
+* Demo FPGA-based SoCs:
+	* **Sigma** - basic MCU consisting of a single sigma_tile module, UDM, and GPIO controller. Can be learned within a single lab work, lab work manual included: https://github.com/AntonovAlexander/activecore/blob/master/designs/rtl/sigma/doc/sigma_lab_manual.pdf. Location: /designs/rtl/sigma
+![pic_test](designs/rtl/sigma/doc/sigma_struct.png)
+	* **Magma** - NUMA MPSoC consisting of multiple sigma_tile modules connected by Ariele xbar. Location: /designs/rtl/magma
+	* **Sigrun** - Sigma equivalent based on dual-issue superscalar Agenda CPU. Location: /designs/rtl/sigrun
 
-### 3. Тестирование на плате
-1. Подключите плату Digilent Nexys A7 по USB.
-2. Прошейте битстрим через Vivado Hardware Manager.
-3. В файле `sw/udm_test.py` укажите ваш номер COM-порта.
-4. Запустите скрипт:
-   ```bash
-   python sw/udm_test.py
-   ```
-   Скрипт автоматически прогонит тесты и выведет статус побитового совпадения `ALL TESTS PASSED!`.
+### Publications
+
+* A. Antonov, “Structured Design of Complex Hardware Microarchitectures Based on Explicit Generic Implementations of Custom Microarchitectural Mechanisms,” Electronics 2022, Vol. 11, Issue 7, article 1055, 28.03.2022. URL: https://www.mdpi.com/2079-9292/11/7/1055
+
+* A. Antonov, “Superscalar Out-of-Order RISC-V ASIP Based on Programmable Hardware Generator with Decoupled Computations and Flow Control,” in 2022 11th Mediterranean Conference on Embedded Computing (MECO), 2022. URL: https://ieeexplore.ieee.org/document/9797182
+
+* A. Antonov, “Inferring Custom Synthesizable Kernel for Generation of Coprocessors with Out-of-Order Execution,” in 2021 10th Mediterranean Conference on Embedded Computing (MECO), 2021. URL: https://ieeexplore.ieee.org/document/9460265
+
+* A. Antonov, P. Kustarev, “Strategies of Computational Process Synthesis – a System-Level Model of HW/SW (Micro)Architectural Mechanisms,” in 2020 9th Mediterranean Conference on Embedded Computing (MECO), 2020. URL: https://ieeexplore.ieee.org/document/9134071
+
+* A. Antonov, P. Kustarev, S. Bikovsky, “MLIP Cores: Designing Hardware Generators with Programmable Microarchitectural Mechanisms,” in 2020 IEEE International Symposium on Circuits and Systems (ISCAS), 2020. URL: https://ieeexplore.ieee.org/document/9180593
+
+* A. Antonov, P. Kustarev, S. Bikovsky, "Improving Microarchitecture Design and Hardware Generation using Micro-Language IP Cores", in Proc. IEEE Nordic Circuits and Systems Conference (NORCAS) / NORCHIP and International Symposium of System-on-Chip (SoC) - 2017, pp. 1-6. URL: https://ieeexplore.ieee.org/document/8124952
+
+* A. Antonov, “Methods and Tools for Computer-Aided Synthesis of Processors Based on Microarchitectural Programmable Hardware Generators,” Ph.D dissertation (in Russian), ITMO University, Saint-Petersburg, 28.12.2018. URL: http://fppo.ifmo.ru/dissertation/?number=63419
+
+* A. Аntonov, "Design of Computer Microarchitecture Basing on Problem-Oriented Languages", Journal of Instrument Engineering (in Russian), 2017, Vol. 60, No. 10, pp. 980—985. URL: http://pribor.ifmo.ru/en/article/17220/proektirovanie_mikroarhitektury_vychisliteley_na_baze_problemno-orientirovannyh_yazykov.htm
