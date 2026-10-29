@@ -44,7 +44,7 @@ class udm:
             baudrate (int): baudrate
 
         """
-        self.ser = serial.Serial(com_num, baudrate, 8)   
+        self.ser = serial.Serial(com_num, baudrate, 8, timeout=3)   
     
     def con(self, com_num, baudrate):
         """Description:
@@ -71,6 +71,8 @@ class udm:
     
     def __getbyte(self):
         rdata = self.ser.read(1)
+        if len(rdata) == 0:
+            raise Exception("Read timeout: FPGA stopped responding")
         rdata = struct.unpack("B", rdata)
         return rdata[0]
     
@@ -108,7 +110,10 @@ class udm:
         wdata = (struct.pack('B', self.__sync_byte))
         wdata = wdata + (struct.pack('B', self.__idcode_cmd))
         self.ser.write(wdata)
-        rdata = self.ser.read()
+        rdata = self.ser.read(1)
+        if len(rdata) == 0:
+            print(f"Connection failed: FPGA did not respond within timeout on {self.ser.port}.")
+            raise Exception("FPGA communication timeout: No response received")
         rdata = struct.unpack('B', rdata)
         
         if (rdata[0] == self.__sync_byte):
