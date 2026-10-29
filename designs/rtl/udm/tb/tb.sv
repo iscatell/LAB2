@@ -80,7 +80,9 @@ localparam CSR_LED_ADDR         = 32'h00000000;
 localparam CSR_SW_ADDR          = 32'h00000004;
 localparam CSR_Y_ADDR           = 32'h10000000;
 localparam CSR_X_ADDR           = 32'h10000004;
+localparam CSR_START_ADDR       = 32'h10000008;
 localparam CSR_ANGLE_ADDR       = 32'h20000000;
+localparam CSR_STATUS_ADDR      = 32'h20000004;
 localparam TESTMEM_ADDR         = 32'h80000000;
 
 initial
@@ -88,7 +90,7 @@ initial
     logic [31:0] wrdata [];
     integer ARRSIZE=10;
     
-	$display ("### SIMULATION STARTED ###");
+	$display ("### SIMULATION STARTED (LAB 3 MULTICYCLE CORDIC) ###");
 	
 	SW = 8'h30;
 	RESET_ALL();
@@ -100,43 +102,61 @@ initial
 	WAIT(100);
 	
 	// ============================================================
-	// CORDIC atan2 verification tests across all 4 quadrants
+	// CORDIC atan2 multicycle verification tests (34 cycles each)
 	// ============================================================
 
 	// Test 1: Quadrant I (y = 100, x = 100) -> Expected: 0x191c9ac2
 	$display ("Testing Quadrant I: y = 100, x = 100");
 	udm.wr32(CSR_Y_ADDR, 32'd100);
 	udm.wr32(CSR_X_ADDR, 32'd100);
+	udm.wr32(CSR_START_ADDR, 32'd1);
+	WAIT(50);
+	udm.rd32(CSR_STATUS_ADDR);
 	udm.rd32(CSR_ANGLE_ADDR);
 
 	// Test 2: Quadrant II (y = 100, x = -100) -> Expected: 0x4b60916b
 	$display ("Testing Quadrant II: y = 100, x = -100");
 	udm.wr32(CSR_Y_ADDR, 32'd100);
 	udm.wr32(CSR_X_ADDR, -32'd100);
+	udm.wr32(CSR_START_ADDR, 32'd1);
+	WAIT(50);
+	udm.rd32(CSR_STATUS_ADDR);
 	udm.rd32(CSR_ANGLE_ADDR);
 
 	// Test 3: Quadrant III (y = -100, x = -100) -> Expected: 0xb494ad71
 	$display ("Testing Quadrant III: y = -100, x = -100");
 	udm.wr32(CSR_Y_ADDR, -32'd100);
 	udm.wr32(CSR_X_ADDR, -32'd100);
+	udm.wr32(CSR_START_ADDR, 32'd1);
+	WAIT(50);
+	udm.rd32(CSR_STATUS_ADDR);
 	udm.rd32(CSR_ANGLE_ADDR);
 
 	// Test 4: Quadrant IV (y = -100, x = 100) -> Expected: 0xe6d8a41a
 	$display ("Testing Quadrant IV: y = -100, x = 100");
 	udm.wr32(CSR_Y_ADDR, -32'd100);
 	udm.wr32(CSR_X_ADDR, 32'd100);
+	udm.wr32(CSR_START_ADDR, 32'd1);
+	WAIT(50);
+	udm.rd32(CSR_STATUS_ADDR);
 	udm.rd32(CSR_ANGLE_ADDR);
 
 	// Test 5: Positive Y-axis (y = 100, x = 0) -> Expected: 0x324a5b8e
 	$display ("Testing +Y axis: y = 100, x = 0");
 	udm.wr32(CSR_Y_ADDR, 32'd100);
 	udm.wr32(CSR_X_ADDR, 32'd0);
+	udm.wr32(CSR_START_ADDR, 32'd1);
+	WAIT(50);
+	udm.rd32(CSR_STATUS_ADDR);
 	udm.rd32(CSR_ANGLE_ADDR);
 
 	// Test 6: Zero point (y = 0, x = 0) -> Expected: 0x00000000
 	$display ("Testing (0, 0): y = 0, x = 0");
 	udm.wr32(CSR_Y_ADDR, 32'd0);
 	udm.wr32(CSR_X_ADDR, 32'd0);
+	udm.wr32(CSR_START_ADDR, 32'd1);
+	WAIT(50);
+	udm.rd32(CSR_STATUS_ADDR);
 	udm.rd32(CSR_ANGLE_ADDR);
 	
 	WAIT(1000);

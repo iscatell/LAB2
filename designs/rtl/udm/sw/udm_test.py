@@ -69,9 +69,11 @@ except Exception as e:
     print(f"Connection failed: {e}")
     sys.exit(1)
 
-CSR_Y_ADDR     = 0x10000000
-CSR_X_ADDR     = 0x10000004
-CSR_ANGLE_ADDR = 0x20000000
+CSR_Y_ADDR      = 0x10000000
+CSR_X_ADDR      = 0x10000004
+CSR_START_ADDR  = 0x10000008
+CSR_ANGLE_ADDR  = 0x20000000
+CSR_STATUS_ADDR = 0x20000004
 
 
 # ============================================================
@@ -89,19 +91,23 @@ test_vectors = [
     (0, 0),
 ]
 
-print("1. Running Quadrant Spot Tests:")
-print("-" * 75)
+print("1. Running Quadrant Spot Tests (Multicycle CORDIC, ~34 cycles/op):")
+print("-" * 80)
 for y, x in test_vectors:
     u.wr32(CSR_Y_ADDR, y & 0xFFFFFFFF)
     u.wr32(CSR_X_ADDR, x & 0xFFFFFFFF)
+    u.wr32(CSR_START_ADDR, 1)  # Запуск вычислений
+
+    status_raw = u.rd32(CSR_STATUS_ADDR)
+    ready_flag = status_raw & 0x1
 
     hw_raw = u.rd32(CSR_ANGLE_ADDR)
     hw_val = hw_raw if hw_raw < 0x80000000 else hw_raw - 0x100000000
     exp_val = atan2_cordic_hw(y, x)
 
     status = "OK" if hw_val == exp_val else "MISMATCH!"
-    print(f"y={y:5d}, x={x:5d} | HW: {hw_val:11d} (0x{hw_raw:08x}) | Exp: {exp_val:11d} | {status}")
-print("-" * 75 + "\n")
+    print(f"y={y:5d}, x={x:5d} | HW: {hw_val:11d} (0x{hw_raw:08x}) | Exp: {exp_val:11d} | Ready={ready_flag} | {status}")
+print("-" * 80 + "\n")
 
 
 # ============================================================
@@ -116,9 +122,10 @@ diff_arr = []
 FIXED_X = 100
 
 for y in range(-1000, 1000, 10):
-    # Запись аргументов в плату
+    # Запись аргументов и запуск
     u.wr32(CSR_Y_ADDR, y & 0xFFFFFFFF)
     u.wr32(CSR_X_ADDR, FIXED_X & 0xFFFFFFFF)
+    u.wr32(CSR_START_ADDR, 1)
 
     # Чтение ответа с платы и перевод в знаковый формат
     hw_raw = u.rd32(CSR_ANGLE_ADDR)

@@ -90,7 +90,9 @@ localparam CSR_LED_ADDR         = 32'h00000000;
 localparam CSR_SW_ADDR          = 32'h00000004;
 localparam CSR_Y_ADDR           = 32'h10000000;
 localparam CSR_X_ADDR           = 32'h10000004;
+localparam CSR_START_ADDR       = 32'h10000008;
 localparam CSR_ANGLE_ADDR       = 32'h20000000;
+localparam CSR_STATUS_ADDR      = 32'h20000004;
 localparam TESTMEM_ADDR         = 32'h80000000;
 
 localparam TESTMEM_WSIZE_POW    = 10;
@@ -134,29 +136,39 @@ assign udm_bus.ack = udm_bus.req;   // bus always ready to accept request
 logic udm_csr_resp, udm_testmem_resp;
 logic [31:0] udm_csr_rdata;
 
-// CSR instantiation for CORDIC atan2
+// CSR instantiation for CORDIC atan2 multicycle
 logic signed [31:0] csr_y_in;
 logic signed [31:0] csr_x_in;
 logic signed [31:0] csr_angle_out;
+logic               csr_start;
+logic               csr_busy;
+logic               csr_ready;
 
-// Combinational module instantiation
-atan2_cordic_comb atan2_inst (
-    .y_bi(csr_y_in),
-    .x_bi(csr_x_in),
-    .angle_bo(csr_angle_out)
+// Multicycle module instantiation
+atan2_cordic_multicycle atan2_inst (
+    .clk_i   (clk_gen),
+    .rst_i   (srst),
+    .start_i (csr_start),
+    .y_bi    (csr_y_in),
+    .x_bi    (csr_x_in),
+    .angle_bo(csr_angle_out),
+    .busy_bo (csr_busy),
+    .ready_bo(csr_ready)
 );
 
 // bus request
 always @(posedge clk_gen)
     begin
-    udm_csr_resp <= 1'b0;
+    udm_csr_resp     <= 1'b0;
     udm_testmem_resp <= 1'b0;
+    csr_start        <= 1'b0;
     
     if (srst)
         begin
-        LED <= 16'hffff;
-        csr_y_in <= 32'sd0;
-        csr_x_in <= 32'sd0;
+        LED       <= 16'hffff;
+        csr_y_in  <= 32'sd0;
+        csr_x_in  <= 32'sd0;
+        csr_start <= 1'b0;
         end
     
     else
@@ -167,9 +179,10 @@ always @(posedge clk_gen)
             
             if (udm_bus.we)     // writing
                 begin
-                if (udm_bus.addr == CSR_LED_ADDR) LED <= udm_bus.wdata;
-                if (udm_bus.addr == CSR_Y_ADDR)   csr_y_in <= udm_bus.wdata;
-                if (udm_bus.addr == CSR_X_ADDR)   csr_x_in <= udm_bus.wdata;
+                if (udm_bus.addr == CSR_LED_ADDR)   LED <= udm_bus.wdata;
+                if (udm_bus.addr == CSR_Y_ADDR)     csr_y_in <= udm_bus.wdata;
+                if (udm_bus.addr == CSR_X_ADDR)     csr_x_in <= udm_bus.wdata;
+                if (udm_bus.addr == CSR_START_ADDR) csr_start <= udm_bus.wdata[0];
                 end
             
             else                // reading
@@ -188,6 +201,11 @@ always @(posedge clk_gen)
                     begin
                     udm_csr_resp <= 1'b1;
                     udm_csr_rdata <= csr_angle_out;
+                    end
+                if (udm_bus.addr == CSR_STATUS_ADDR)
+                    begin
+                    udm_csr_resp <= 1'b1;
+                    udm_csr_rdata <= {30'b0, csr_busy, csr_ready};
                     end
                 udm_testmem_resp <= udm_testmem_enb;
                 end
