@@ -58,7 +58,7 @@ class udm:
             Disconnect from COM port
 
         """
-        if self.ser.is_open:
+        if hasattr(self, 'ser') and self.ser is not None and self.ser.is_open:
             self.ser.close()
             print("Connection dropped")
     

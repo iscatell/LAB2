@@ -59,7 +59,7 @@ def atan2_cordic_hw(y, x):
 # Подключение к FPGA плате
 # ============================================================
 COM_PORT = 'COM3'  # Укажите актуальный COM-порт из Диспетчера устройств
-BAUDRATE = 921600
+BAUDRATE = 115200  # Стандартная надежная скорость для Windows / FTDI (UDM поддерживает auto-baud)
 
 print(f"Connecting to FPGA via UDM on {COM_PORT} at {BAUDRATE} baud...")
 try:
